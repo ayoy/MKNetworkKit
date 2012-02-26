@@ -77,6 +77,11 @@
 - (void) showLocalNotification;
 - (void) endBackgroundTask;
 
+@property (nonatomic, copy) NSString *cachedCurlCommandLineString;
+@property (nonatomic, copy) NSString *cachedUniqueIdentifier;
+- (void) updateCachedCurlCommandLineString;
+- (void) updateCachedUniqueIdentifier;
+
 @end
 
 @implementation MKNetworkOperation
@@ -129,6 +134,9 @@
 @synthesize cacheHeaders = _cacheHeaders;
 @synthesize error = _error;
 
+@synthesize cachedCurlCommandLineString = _cachedCurlCommandLineString;
+@synthesize cachedUniqueIdentifier = _cachedUniqueIdentifier;
+
 
 // A RESTful service should always return the same response for a given URL and it's parameters.
 // this means if these values are correct, you can cache the responses
@@ -162,6 +170,7 @@
     [self.request setValue:
      [NSString stringWithFormat:@"%@; charset=%@", contentType, charset]
         forHTTPHeaderField:@"Content-Type"];
+    [self updateCachedCurlCommandLineString];
 }
 //=========================================================== 
 //  freezable 
@@ -227,23 +236,28 @@
     return NO;
 }
 
-
--(NSString*) uniqueIdentifier {
+-(void) updateCachedUniqueIdentifier {
     
-    NSString *str = [self curlCommandLineString];
+    NSMutableString *str = [NSMutableString stringWithString:self.cachedCurlCommandLineString];
     
     if(self.username || self.password) {
         
-        str = [str stringByAppendingFormat:@" [%@:%@]",
-               self.username ? self.username : @"",
-               self.password ? self.password : @""];
+        [str appendFormat:@" [%@:%@]",
+         self.username ? self.username : @"",
+         self.password ? self.password : @""];
     }
     
     if(self.freezable) {
         
-        str = [str stringByAppendingString:self.uniqueId];
+        [str appendString:self.uniqueId];
     }
-    return [str md5];
+
+    self.cachedUniqueIdentifier = [str md5];
+}
+
+-(NSString*) uniqueIdentifier {
+
+    return self.cachedUniqueIdentifier;
 }
 
 -(BOOL) isCachedResponse {
@@ -408,16 +422,22 @@
     
     NSString *lastModified = [headers objectForKey:@"Last-Modified"];
     NSString *eTag = [headers objectForKey:@"ETag"];
+    BOOL curlUpdateNeeded = NO;
     /* Not really necessary to set the method as "HEAD" We do need the complete data if it was modified */
     if(lastModified) {
         //[self.request setHTTPMethod:@"HEAD"];
         [self.request setValue:lastModified forHTTPHeaderField:@"IF-MODIFIED-SINCE"];
+        curlUpdateNeeded = YES;
     }
     
     if(eTag) {
         //[self.request setHTTPMethod:@"HEAD"];
         [self.request setValue:eTag forHTTPHeaderField:@"IF-NONE-MATCH"];
+        curlUpdateNeeded = YES;
     }    
+
+    if (curlUpdateNeeded)
+        [self updateCachedCurlCommandLineString];
 }
 
 -(void) setUsername:(NSString*) username password:(NSString*) password {
@@ -545,7 +565,8 @@
                     break;
             }
         }
-        
+
+        [self updateCachedCurlCommandLineString];
         self.state = MKNetworkOperationStateReady;
     }
     
@@ -557,6 +578,7 @@
     [headersDictionary enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
         [self.request addValue:obj forHTTPHeaderField:key];
     }];
+    [self updateCachedCurlCommandLineString];
 }
 
 /*
@@ -577,7 +599,7 @@
     return displayString;
 }
 
--(NSString*) curlCommandLineString
+-(void) updateCachedCurlCommandLineString
 {
     __block NSMutableString *displayString = [NSMutableString stringWithFormat:@"curl -X %@", self.request.HTTPMethod];
     
@@ -613,7 +635,14 @@
          }];*/
     }
     
-    return displayString;
+    self.cachedCurlCommandLineString = [NSString stringWithString:displayString];
+
+    [self updateCachedUniqueIdentifier];
+}
+
+-(NSString*) curlCommandLineString {
+
+    return self.cachedCurlCommandLineString;
 }
 
 
@@ -633,6 +662,8 @@
                           nil];
     
     [self.dataToBePosted addObject:dict];    
+    
+    [self updateCachedCurlCommandLineString];
 }
 
 -(void) addFile:(NSString*) filePath forKey:(NSString*) key {
@@ -651,6 +682,8 @@
                           nil];
     
     [self.filesToBePosted addObject:dict];    
+
+    [self updateCachedCurlCommandLineString];
 }
 
 -(NSData*) bodyData {
@@ -718,6 +751,8 @@
         
         [self.request setValue:[NSString stringWithFormat:@"%d", [body length]] forHTTPHeaderField:@"Content-Length"];
     }
+    
+    [self updateCachedCurlCommandLineString];
     
     return body;
 }
