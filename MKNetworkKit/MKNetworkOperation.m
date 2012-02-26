@@ -43,6 +43,7 @@
 
 @property (nonatomic, strong) NSMutableArray *responseBlocks;
 @property (nonatomic, strong) NSMutableArray *errorBlocks;
+@property (nonatomic, strong) NSMutableArray *alreadyQueuedBlocks;
 
 @property (nonatomic, assign) MKNetworkOperationState state;
 @property (nonatomic, assign) BOOL isCancelled;
@@ -104,6 +105,7 @@
 
 @synthesize responseBlocks = _responseBlocks;
 @synthesize errorBlocks = _errorBlocks;
+@synthesize alreadyQueuedBlocks = _alreadyQueuedBlocks;
 
 @synthesize isCancelled = _isCancelled;
 @synthesize mutableData = _mutableData;
@@ -368,6 +370,7 @@
     [theCopy setClientCertificate:[self.clientCertificate copy]];
     [theCopy setResponseBlocks:[self.responseBlocks copy]];
     [theCopy setErrorBlocks:[self.errorBlocks copy]];
+    [theCopy setAlreadyQueuedBlocks:[self.alreadyQueuedBlocks copy]];
     [theCopy setState:self.state];
     [theCopy setIsCancelled:self.isCancelled];
     [theCopy setMutableData:[self.mutableData copy]];
@@ -396,6 +399,9 @@
     [self.uploadProgressChangedHandlers addObjectsFromArray:operation.uploadProgressChangedHandlers];
     [self.downloadProgressChangedHandlers addObjectsFromArray:operation.downloadProgressChangedHandlers];
     [self.downloadStreams addObjectsFromArray:operation.downloadStreams];
+
+    for(MKNKAlreadyQueuedBlock alreadyQueuedBlock in operation.alreadyQueuedBlocks)
+        alreadyQueuedBlock(self);
 }
 
 -(void) setCachedData:(NSData*) cachedData {
@@ -450,6 +456,10 @@
     [self.downloadProgressChangedHandlers addObject:[downloadProgressBlock copy]];
 }
 
+-(void) onAlreadyQueued:(MKNKAlreadyQueuedBlock)alreadyQueuedBlock {
+    [self.alreadyQueuedBlocks addObject:[alreadyQueuedBlock copy]];
+}
+
 -(void) setUploadStream:(NSInputStream*) inputStream {
     
 #warning Method not tested yet.
@@ -470,6 +480,7 @@
         
         self.responseBlocks = [NSMutableArray array];
         self.errorBlocks = [NSMutableArray array];        
+        self.alreadyQueuedBlocks = [NSMutableArray array];
         
         self.filesToBePosted = [NSMutableArray array];
         self.dataToBePosted = [NSMutableArray array];
@@ -822,6 +833,9 @@
     
     [self.errorBlocks removeAllObjects];
     self.errorBlocks = nil;
+    
+    [self.alreadyQueuedBlocks removeAllObjects];
+    self.alreadyQueuedBlocks = nil;
     
     [self.uploadProgressChangedHandlers removeAllObjects];
     self.uploadProgressChangedHandlers = nil;

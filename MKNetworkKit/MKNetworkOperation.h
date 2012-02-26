@@ -33,6 +33,7 @@ typedef enum {
 
 typedef void (^MKNKProgressBlock)(double progress);
 typedef void (^MKNKResponseBlock)(MKNetworkOperation* completedOperation);
+typedef void (^MKNKAlreadyQueuedBlock)(MKNetworkOperation *queuedOperation);
 #if TARGET_OS_IPHONE
 typedef void (^MKNKImageBlock) (UIImage* fetchedImage, NSURL* url, BOOL isInCache);
 #elif TARGET_OS_MAC
@@ -361,7 +362,7 @@ typedef enum {
  *  handler was invoked with a cached data or with real data by calling the isCachedResponse method.
  *
  *  @seealso
- *  isCachedResponse
+ *  isCachedResponse, onAlreadyQueued:
  */
 -(void) onCompletion:(MKNKResponseBlock) response onError:(MKNKErrorBlock) error;
 
@@ -384,6 +385,18 @@ typedef enum {
  *
  */
 -(void) onDownloadProgressChanged:(MKNKProgressBlock) downloadProgressBlock;
+
+/*!
+ *  @abstract Block Handler for when a given operation is already queued
+ *  
+ *  @discussion
+ *	This method can be used to handle situations when a given operation is already
+ *  enqueued. alreadyQueuedBlock is called from MKNetworkEngine's enqueueOperation:
+ *  when an operation is already present in the operation queue, and it takes
+ *  that already queued operation as a parameter.
+ *
+ */
+-(void) onAlreadyQueued:(MKNKAlreadyQueuedBlock) alreadyQueuedBlock;
 
 /*!
  *  @abstract Uploads a resource from a stream
